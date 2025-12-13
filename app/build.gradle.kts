@@ -31,6 +31,14 @@ android {
                 "proguard-rules.pro"
             )
         }
+        packaging {
+            resources {
+                excludes += "META-INF/NOTICE.md"
+                excludes += "META-INF/LICENSE.md"
+                excludes += "META-INF/NOTICE"
+                excludes += "META-INF/LICENSE"
+            }
+        }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_1_8
@@ -80,6 +88,7 @@ dependencies {
     implementation("com.google.firebase:firebase-firestore-ktx")
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-analytics-ktx")
+    implementation(libs.firebase.firestore)
 
     // --- 4. 測試相關 ---
     testImplementation("junit:junit:4.13.2")
@@ -92,4 +101,7 @@ dependencies {
 
 
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-}
+
+        implementation("com.sun.mail:android-mail:1.6.7")
+        implementation("com.sun.mail:android-activation:1.6.7")
+    }

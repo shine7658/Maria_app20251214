@@ -1,5 +1,7 @@
 package com.example.mariaapp.view
 
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -88,14 +90,43 @@ fun StaffScreen(viewModel: BakeryViewModel) {
             ) {
                 items(currentTasks) { order ->
                     TaskCard(order = order) {
+                        // 1. 更新資料庫狀態 (打勾)
                         viewModel.markOrderAsReady(order.id)
 
-                        // ✅ 這裡實作「模擬發送通知」 (符合 PDF P.6)
-                        Toast.makeText(
-                            context,
-                            "系統已發送取貨通知信給：${order.email}",
-                            Toast.LENGTH_LONG
-                        ).show()
+                        // 2. 準備 Email 內容
+                        val subject = "【瑪利MAMA】取貨通知：${order.customerName} 您的麵包好囉！"
+
+                        // 自動生成的信件內文
+                        val body = """
+                            親愛的 ${order.customerName} 您好：
+                            
+                            您預約在 ${order.pickupTime} 取貨的麵包已經製作完成囉！
+                            請您可以準備前來取貨了。
+                            
+                            訂單內容：
+                            ${order.items.joinToString("\n") { "- ${it.name} x ${it.qty}" }}
+                            
+                            瑪利MAMA 期待您的光臨！
+                        """.trimIndent()
+
+                        // 3. 判斷是否有 Email 並開啟 App
+                        if (order.email.isNotEmpty()) {
+                            val intent = Intent(Intent.ACTION_SENDTO).apply {
+                                data = Uri.parse("mailto:") // 限定只開啟 Email 類型的 App
+                                putExtra(Intent.EXTRA_EMAIL, arrayOf(order.email)) // 收件人
+                                putExtra(Intent.EXTRA_SUBJECT, subject) // 主旨
+                                putExtra(Intent.EXTRA_TEXT, body) // 內文
+                            }
+
+                            try {
+                                context.startActivity(intent)
+                                Toast.makeText(context, "正開啟信箱通知 ${order.customerName}...", Toast.LENGTH_LONG).show()
+                            } catch (e: Exception) {
+                                Toast.makeText(context, "找不到 Email App，請確認手機有安裝 Gmail", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            Toast.makeText(context, "訂單已完成！(此顧客未留 Email)", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             }

@@ -6,6 +6,9 @@ import com.example.mariaapp.model.BakeryOrder
 import com.example.mariaapp.model.BakeryRepository
 import com.example.mariaapp.model.OrderItem
 import com.example.mariaapp.model.Product
+// ⚠️ 記得引用我們剛剛寫好的 GMailSender (如果它在上一層 package)
+import com.example.mariaapp.GMailSender
+
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -65,7 +68,7 @@ class BakeryViewModel : ViewModel() {
     fun submitOrder(name: String, email: String, timeSlot: String, onSuccess: () -> Unit) {
         val newOrder = BakeryOrder(
             customerName = name,
-            email = email, // ✅ 將 email 存入物件
+            email = email,
             pickupTime = timeSlot,
             items = _cart.value,
             pickupDate = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date()),
@@ -87,6 +90,33 @@ class BakeryViewModel : ViewModel() {
     fun markOrderAsReady(orderId: String) {
         viewModelScope.launch {
             repository.updateOrderStatus(orderId, "ready")
+        }
+    }
+
+    // ✅ [員工功能] 新增：背景發送 Email 通知
+    fun sendEmailNotification(email: String, name: String, items: List<OrderItem>) {
+        viewModelScope.launch {
+            // 準備信件內容
+            val subject = "【瑪利MAMA】取貨通知：$name 您的麵包好囉！"
+            val body = """
+                親愛的 $name 您好：
+                
+                您訂購的麵包已經製作完成，請您可以準備前來取貨了。
+                
+                訂單內容：
+                ${items.joinToString("\n") { "- ${it.name} x ${it.qty}" }}
+                
+                瑪利MAMA 庇護工場感謝您的支持！
+            """.trimIndent()
+
+            try {
+                // 呼叫 GMailSender 工具 (必須先完成 GMailSender.kt 的設定)
+                GMailSender.sendEmail(email, subject, body)
+                println("✅ Email 發送成功至: $email")
+            } catch (e: Exception) {
+                println("❌ Email 發送失敗: ${e.message}")
+                e.printStackTrace()
+            }
         }
     }
 

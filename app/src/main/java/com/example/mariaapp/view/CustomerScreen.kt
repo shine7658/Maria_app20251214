@@ -34,9 +34,50 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
 
     // 假商品資料
     val products = listOf(
-        Product("1", "招牌菠蘿", 35, "bread"),
-        Product("2", "紅豆麵包", 30, "bean"),
-        Product("3", "蔥花麵包", 35, "onion")
+        Product("1", "瑪麗媽媽經典", 200,),
+        Product("2", "陽光百果", 150, ),
+        Product("3", "黑五寶", 40, ),
+        Product("4", "裸麥南瓜", 45, ),
+        Product("5", "法國起司堡", 60,),
+        Product("6", "天然酵母乳酪", 35, ),
+        Product("7", "維也納麵包", 30, ),
+        Product("8", "法國起司球", 18, ),
+        Product("9", "蔓越莓乳酪", 25,),
+        Product("10", "黑橄欖乳酪", 25, ),
+        Product("11", "巧克力葡萄乾", 20, ),
+        Product("12", "核桃", 20, ),
+        Product("13", "歐克", 40,),
+        Product("14", "布里歐莓", 120, ),
+        Product("15", "小波羅(5入)", 50, ),
+        Product("16", "椰香", 35, ) ,
+        Product("17", "紅豆麵包", 30,),
+        Product("18", "墨西哥巧克力", 30, ),
+        Product("19", "爆漿餐包(8入)", 70, ),
+        Product("20", "法國魔杖", 55, ),
+        Product("21", "德國小香腸(4入)", 50,),
+        Product("22", "法式香蒜", 40, ),
+        Product("23", "不脹氣吐司", 45, ),
+        Product("24", "鮮奶吐司", 45, ),
+        Product("25", "全麥吐司", 60,),
+        Product("26", "蛋糕吐司", 70, ),
+        Product("27", "葡萄乾吐司", 75, ),
+        Product("28", "火腿起司吐司", 100, ),
+        Product("29", "輕乳酪(小)", 35,),
+        Product("30", "檸檬塔", 70, ),
+        Product("31", "布朗尼", 30, ),
+        Product("32", "德式布丁", 40, ),
+        Product("33", "黃金乳酪", 35, ),
+        Product("34", "丹麥菊花", 60, ),
+        Product("35", "丹麥巧克力", 60, ),
+        Product("36", "燕麥餅乾", 60,),
+        Product("37", "杏仁巧克力", 80, ),
+        Product("38", "核桃酥", 80, ),
+        Product("39", "芝麻蘇", 80, ),
+        Product("40", "英式伯爵紅茶", 80,),
+        Product("41", "義式咖啡", 80, ),
+        Product("42", "南瓜子瓦片", 90, ),
+        Product("43", "杏仁瓦片", 90, ),
+        Product("44", "牛奶餅乾", 80, )
     )
 
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFFFF8F0))) {
@@ -48,10 +89,12 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
         if (step == 1) {
             // 選單
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2),
+                columns = GridCells.Fixed(2), // 改回 2 欄，圖比較大比較好看
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                // ✅ 加入這一行：讓列表佔據「剩餘」空間，而不是「所有」空間
+                modifier = Modifier.weight(1f)
             ) {
                 items(products) { product ->
                     ProductCard(product) { viewModel.addToCart(product) }
