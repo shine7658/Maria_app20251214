@@ -7,10 +7,12 @@ data class Product(
     val id: String = "",
     val name: String = "",
     val price: Int = 0,
+    // ✅ 新增：分類欄位 (預設為麵包)，讓 CustomerScreen 可以進行過濾
+    val category: String = "麵包",
+
     val iconName: String = "bread",
     val maxDailyQty: Int = 20,
-    // 為了讓購物車 UI 能運作，我們還是需要暫存 qty，但加上 @Exclude 讓 Firebase 不存它
-    // 如果沒有 Firebase 依賴，暫時先留著這個 var
+    // 為了讓購物車 UI 能運作，我們還是需要暫存 qty
     var qty: Int = 0
 )
 
@@ -46,6 +48,6 @@ data class BakeryOrder(
     var isCompleted: Boolean
         get() = status == "completed"
         set(value) {
-            // 這裡通常不會用到 set，因為我們會直接改 status，但為了相容性先留空或做轉換
+            // 這裡通常不會用到 set，因為我們會直接改 status
         }
 }
