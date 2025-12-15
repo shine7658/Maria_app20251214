@@ -14,8 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History // 新增圖示
-import androidx.compose.material.icons.filled.Close // 新增圖示
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,8 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog // 新增 Dialog
-import com.example.mariaapp.model.BakeryOrder // 需確認有引用此 Model
+import androidx.compose.ui.window.Dialog
+import com.example.mariaapp.model.BakeryOrder
 import com.example.mariaapp.model.Product
 import com.example.mariaapp.viewmodel.BakeryViewModel
 import java.text.SimpleDateFormat
@@ -47,14 +47,13 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     val cart by viewModel.cart.collectAsState()
     val selectedDate by viewModel.selectedDate.collectAsState()
     val soldMap by viewModel.soldQtyMap.collectAsState()
-    // 假設 ViewModel 有公開所有訂單資料 (為了查詢功能)
     val allOrders by viewModel.orders.collectAsState()
 
     // 3. 狀態變數
     var step by remember { mutableStateOf(1) }
     var selectedTime by remember { mutableStateOf<String?>(null) }
 
-    // === 步驟五新增：控制訂單查詢視窗的開關 ===
+    // 控制訂單查詢視窗的開關
     var showOrderHistory by remember { mutableStateOf(false) }
 
     // 自動帶入儲存的帳號資料
@@ -62,7 +61,7 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     var customerName by remember(savedUser) { mutableStateOf(savedUser.first) }
     var customerEmail by remember(savedUser) { mutableStateOf(savedUser.second) }
 
-    // 商品資料 (略，保持原樣)
+    // 商品資料
     val products = listOf(
         Product("1", "瑪麗媽媽經典", 200,),
         Product("2", "陽光百果", 150, ),
@@ -114,7 +113,6 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
         TopAppBar(
             title = { Text("瑪利MAMA 手作麵包", fontWeight = FontWeight.Bold) },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFF9800), titleContentColor = Color.White),
-            // === 步驟五新增：右上角的查詢按鈕 ===
             actions = {
                 IconButton(onClick = { showOrderHistory = true }) {
                     Icon(Icons.Default.History, contentDescription = "查詢訂單", tint = Color.White)
@@ -122,7 +120,7 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
             }
         )
 
-        // === 步驟五新增：訂單查詢彈跳視窗 ===
+        // 訂單查詢彈跳視窗
         if (showOrderHistory) {
             OrderQueryDialog(
                 allOrders = allOrders,
@@ -268,7 +266,7 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     }
 }
 
-// === 步驟五新增：訂單查詢視窗元件 ===
+// === 修改後的：訂單查詢視窗元件 ===
 @Composable
 fun OrderQueryDialog(
     allOrders: List<BakeryOrder>,
@@ -321,28 +319,25 @@ fun OrderQueryDialog(
                                         modifier = Modifier.fillMaxWidth(),
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Text(order.pickupDate, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
-                                        Text(order.pickupTime, fontWeight = FontWeight.Bold)
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
+                                        Text("${order.pickupDate} ${order.pickupTime}", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
 
-                                    // 顯示商品摘要
-                                    order.items.forEach { item ->
-                                        Text("• ${item.name} x${item.qty}", fontSize = 14.sp)
-                                    }
+                                        // ✅ 修改重點：只要狀態不是 "pending" (代表後台已處理) 就顯示已完成
+                                        val isReady = order.status != "pending"
+                                        val statusColor = if (isReady) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                                        val statusText = if (isReady) "可取貨 / 已完成" else "準備中"
 
-                                    Spacer(modifier = Modifier.height(8.dp))
-
-                                    // 狀態顯示
-                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                                        val statusColor = if (order.isCompleted) Color(0xFF4CAF50) else Color(0xFFFF9800)
-                                        val statusText = if (order.isCompleted) "已取貨" else "準備中"
                                         Text(
                                             text = statusText,
                                             color = statusColor,
                                             fontWeight = FontWeight.Bold,
                                             style = MaterialTheme.typography.bodyLarge
                                         )
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // 顯示商品摘要
+                                    order.items.forEach { item ->
+                                        Text("• ${item.name} x${item.qty}", fontSize = 14.sp)
                                     }
                                 }
                             }
