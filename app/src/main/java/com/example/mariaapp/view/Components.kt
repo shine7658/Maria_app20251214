@@ -45,44 +45,57 @@ private fun getBakeryIcon(name: String): ImageVector {
 
 // 1. 商品卡片 (顧客端選單)
 @Composable
-fun ProductCard(product: Product, onClick: () -> Unit) {
+fun ProductCard(
+    product: Product,
+    cartQty: Int,    // 現在購物車裡的數量
+    soldQty: Int,    // 今天已經賣掉的數量
+    onUpdateQty: (Int) -> Unit // +1 或 -1
+) {
+    val remaining = product.maxDailyQty - soldQty
+    val isSoldOut = remaining <= 0
+
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { onClick() },
+        modifier = Modifier.fillMaxWidth().padding(8.dp),
         elevation = CardDefaults.cardElevation(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // ✅ 使用動態圖示：讓顧客選單也看得到區別
-            Icon(
-                imageVector = getBakeryIcon(product.name),
-                contentDescription = null,
-                modifier = Modifier.size(64.dp),
-                tint = Color(0xFF8D6E63)
-            )
+            // 左邊：圖示與名稱
+            Column(modifier = Modifier.weight(1f)) {
+                Text(product.name, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text("$${product.price}", color = Color(0xFFFF9800))
+                if (isSoldOut) {
+                    Text("今日完售", color = Color.Red, fontSize = 12.sp)
+                } else {
+                    Text("剩餘: $remaining", color = Color.Gray, fontSize = 12.sp)
+                }
+            }
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // 商品名稱
-            Text(
-                text = product.name,
-                fontWeight = FontWeight.Bold,
-                fontSize = 18.sp,
-                modifier = Modifier.padding(horizontal = 4.dp),
-                maxLines = 1 // 避免名字太長換行太醜
-            )
-
-            // 價格
-            Text("$${product.price}", color = Color(0xFFFF9800), fontWeight = FontWeight.Bold)
-
-            Button(
-                onClick = onClick,
-                modifier = Modifier.padding(top=8.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE0B2), contentColor = Color(0xFFE65100))
-            ) {
-                Text("+ 加入")
+            // 右邊：增減按鈕
+            if (cartQty > 0) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { onUpdateQty(-1) }) {
+                        Text("-", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Text("$cartQty", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    IconButton(
+                        onClick = { onUpdateQty(1) },
+                        enabled = remaining > cartQty // 如果剩餘庫存 > 購物車數量 才能加
+                    ) {
+                        Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            } else {
+                Button(
+                    onClick = { onUpdateQty(1) },
+                    enabled = !isSoldOut,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFFE0B2), contentColor = Color(0xFFE65100))
+                ) {
+                    Text(if(isSoldOut) "完售" else "+ 加入")
+                }
             }
         }
     }

@@ -4,12 +4,18 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.History // 新增圖示
+import androidx.compose.material.icons.filled.Close // 新增圖示
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,20 +25,44 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog // 新增 Dialog
+import com.example.mariaapp.model.BakeryOrder // 需確認有引用此 Model
 import com.example.mariaapp.model.Product
-//import com.example.mariaapp.model.Product
 import com.example.mariaapp.viewmodel.BakeryViewModel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerScreen(viewModel: BakeryViewModel) {
-    val cart by viewModel.cart.collectAsState()
-    var step by remember { mutableStateOf(1) }
-    var selectedTime by remember { mutableStateOf<String?>(null) }
-    var customerName by remember { mutableStateOf("") }
     val context = LocalContext.current
 
-    // 假商品資料
+    // 1. 初始化設定
+    LaunchedEffect(Unit) {
+        viewModel.initSharedPrefs(context)
+    }
+
+    // 2. 訂閱 ViewModel 的資料流
+    val cart by viewModel.cart.collectAsState()
+    val selectedDate by viewModel.selectedDate.collectAsState()
+    val soldMap by viewModel.soldQtyMap.collectAsState()
+    // 假設 ViewModel 有公開所有訂單資料 (為了查詢功能)
+    val allOrders by viewModel.orders.collectAsState()
+
+    // 3. 狀態變數
+    var step by remember { mutableStateOf(1) }
+    var selectedTime by remember { mutableStateOf<String?>(null) }
+
+    // === 步驟五新增：控制訂單查詢視窗的開關 ===
+    var showOrderHistory by remember { mutableStateOf(false) }
+
+    // 自動帶入儲存的帳號資料
+    val savedUser = viewModel.getSavedUser()
+    var customerName by remember(savedUser) { mutableStateOf(savedUser.first) }
+    var customerEmail by remember(savedUser) { mutableStateOf(savedUser.second) }
+
+    // 商品資料 (略，保持原樣)
     val products = listOf(
         Product("1", "瑪麗媽媽經典", 200,),
         Product("2", "陽光百果", 150, ),
@@ -83,21 +113,48 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     Column(modifier = Modifier.fillMaxSize().background(Color(0xFFFFF8F0))) {
         TopAppBar(
             title = { Text("瑪利MAMA 手作麵包", fontWeight = FontWeight.Bold) },
-            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFF9800), titleContentColor = Color.White)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFF9800), titleContentColor = Color.White),
+            // === 步驟五新增：右上角的查詢按鈕 ===
+            actions = {
+                IconButton(onClick = { showOrderHistory = true }) {
+                    Icon(Icons.Default.History, contentDescription = "查詢訂單", tint = Color.White)
+                }
+            }
         )
 
+        // === 步驟五新增：訂單查詢彈跳視窗 ===
+        if (showOrderHistory) {
+            OrderQueryDialog(
+                allOrders = allOrders,
+                currentEmail = customerEmail,
+                onDismiss = { showOrderHistory = false }
+            )
+        }
+
         if (step == 1) {
-            // 選單
+            // === 步驟一：商品選購頁面 ===
+            DateSelector(selectedDate) { newDate ->
+                viewModel.updateDate(newDate)
+            }
+
             LazyVerticalGrid(
-                columns = GridCells.Fixed(2), // 改回 2 欄，圖比較大比較好看
+                columns = GridCells.Fixed(1),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                // ✅ 加入這一行：讓列表佔據「剩餘」空間，而不是「所有」空間
+                verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f)
             ) {
                 items(products) { product ->
-                    ProductCard(product) { viewModel.addToCart(product) }
+                    val inCartQty = cart.find { it.name == product.name }?.qty ?: 0
+                    val soldQty = soldMap[product.name] ?: 0
+
+                    ProductCard(
+                        product = product,
+                        cartQty = inCartQty,
+                        soldQty = soldQty,
+                        onUpdateQty = { delta ->
+                            viewModel.updateCartQty(product, delta)
+                        }
+                    )
                 }
             }
 
@@ -111,9 +168,13 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
                 }
             }
         } else {
-            // 結帳
+            // === 步驟二：訂單確認與結帳 ===
             Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
                 Text("1. 您的訂單", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                Text("預約日期: $selectedDate", color = Color(0xFF1976D2), fontWeight = FontWeight.Bold)
+
+                Spacer(modifier = Modifier.height(8.dp))
+
                 cart.forEach {
                     Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(it.name, fontSize = 18.sp)
@@ -122,6 +183,7 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
+
                 Text("2. 選擇取貨時段", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -158,7 +220,6 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text("3. 訂購人資訊", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
 
-                // 1. 姓名欄位 (保持原樣)
                 OutlinedTextField(
                     value = customerName,
                     onValueChange = { customerName = it },
@@ -168,13 +229,10 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ✅ 2. 新增 Email 欄位 (依照 PDF 第 9 頁)
-                var customerEmail by remember { mutableStateOf("") } // 宣告狀態變數
-
                 OutlinedTextField(
                     value = customerEmail,
                     onValueChange = { customerEmail = it },
-                    label = { Text("Email (接收取貨通知)") }, // 企劃書文字
+                    label = { Text("Email (接收取貨通知)") },
                     placeholder = { Text("example@gmail.com") },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -182,20 +240,160 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
                 Spacer(modifier = Modifier.height(32.dp))
 
                 Button(
+                    onClick = { step = 1 },
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
+                ) {
+                    Text("返回修改", fontSize = 20.sp)
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
                     onClick = {
-                        // ✅ 修改呼叫方式，傳入 customerEmail
                         viewModel.submitOrder(customerName, customerEmail, selectedTime!!) {
-                            // ✅ 修改提示文字，讓使用者知道 Email 已送出
                             Toast.makeText(context, "預約成功！確認信已寄至 $customerEmail", Toast.LENGTH_LONG).show()
                             step = 1
+                            selectedTime = null
                         }
                     },
-                    // ✅ 修改防呆邏輯：Email 也要填寫才能送出
                     enabled = selectedTime != null && customerName.isNotEmpty() && customerEmail.isNotEmpty(),
                     modifier = Modifier.fillMaxWidth().height(56.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
                 ) {
                     Text("確認預約", fontSize = 20.sp)
+                }
+            }
+        }
+    }
+}
+
+// === 步驟五新增：訂單查詢視窗元件 ===
+@Composable
+fun OrderQueryDialog(
+    allOrders: List<BakeryOrder>,
+    currentEmail: String,
+    onDismiss: () -> Unit
+) {
+    // 根據目前輸入的 Email 篩選訂單
+    val myOrders = allOrders.filter { it.email == currentEmail }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.8f),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.White)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                // 標題列
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("我的訂單紀錄", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "關閉")
+                    }
+                }
+
+                Text("查詢 Email: $currentEmail", fontSize = 14.sp, color = Color.Gray)
+                Divider(modifier = Modifier.padding(vertical = 8.dp))
+
+                if (myOrders.isEmpty()) {
+                    Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("目前沒有以此 Email 預約的紀錄", color = Color.Gray)
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        items(myOrders) { order ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5)),
+                                elevation = CardDefaults.cardElevation(2.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(12.dp)) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Text(order.pickupDate, fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
+                                        Text(order.pickupTime, fontWeight = FontWeight.Bold)
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // 顯示商品摘要
+                                    order.items.forEach { item ->
+                                        Text("• ${item.name} x${item.qty}", fontSize = 14.sp)
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // 狀態顯示
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                        val statusColor = if (order.isCompleted) Color(0xFF4CAF50) else Color(0xFFFF9800)
+                                        val statusText = if (order.isCompleted) "已取貨" else "準備中"
+                                        Text(
+                                            text = statusText,
+                                            color = statusColor,
+                                            fontWeight = FontWeight.Bold,
+                                            style = MaterialTheme.typography.bodyLarge
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// 日期選擇器元件 (保持原樣)
+@Composable
+fun DateSelector(selectedDate: String, onDateSelected: (String) -> Unit) {
+    val dates = remember {
+        val list = mutableListOf<String>()
+        val calendar = Calendar.getInstance()
+        val format = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        repeat(7) {
+            list.add(format.format(calendar.time))
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+        list
+    }
+
+    Column(modifier = Modifier.fillMaxWidth().background(Color(0xFFFFF3E0))) {
+        Text(
+            "請選擇預約日期：",
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(start = 16.dp, top = 8.dp),
+            color = Color(0xFFE65100)
+        )
+
+        LazyRow(
+            contentPadding = PaddingValues(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(dates) { date ->
+                val isSelected = date == selectedDate
+                val displayDate = date.substring(5).replace("-", "/")
+
+                Button(
+                    onClick = { onDateSelected(date) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isSelected) Color(0xFFFF9800) else Color.White,
+                        contentColor = if (isSelected) Color.White else Color.Black
+                    ),
+                    border = if (!isSelected) BorderStroke(1.dp, Color.Gray) else null,
+                    shape = RoundedCornerShape(50)
+                ) {
+                    Text(displayDate)
                 }
             }
         }
