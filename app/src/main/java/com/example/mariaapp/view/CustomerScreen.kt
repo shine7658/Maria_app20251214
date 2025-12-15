@@ -14,8 +14,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.EmojiEvents // 新增：獎盃圖示
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -53,15 +54,16 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     var step by remember { mutableStateOf(1) }
     var selectedTime by remember { mutableStateOf<String?>(null) }
 
-    // 控制訂單查詢視窗的開關
+    // 控制視窗開關
     var showOrderHistory by remember { mutableStateOf(false) }
+    var showRanking by remember { mutableStateOf(false) } // 新增：控制熱銷排行視窗
 
     // 自動帶入儲存的帳號資料
     val savedUser = viewModel.getSavedUser()
     var customerName by remember(savedUser) { mutableStateOf(savedUser.first) }
     var customerEmail by remember(savedUser) { mutableStateOf(savedUser.second) }
 
-    // 商品資料
+    // 商品資料 (保持不變)
     val products = listOf(
         Product("1", "瑪麗媽媽經典", 200,),
         Product("2", "陽光百果", 150, ),
@@ -114,11 +116,25 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
             title = { Text("瑪利MAMA 手作麵包", fontWeight = FontWeight.Bold) },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFFF9800), titleContentColor = Color.White),
             actions = {
+                // === 新增：熱銷排行按鈕 ===
+                IconButton(onClick = { showRanking = true }) {
+                    Icon(Icons.Default.EmojiEvents, contentDescription = "熱銷排行", tint = Color.Yellow)
+                }
+                // 原有的查詢訂單按鈕
                 IconButton(onClick = { showOrderHistory = true }) {
                     Icon(Icons.Default.History, contentDescription = "查詢訂單", tint = Color.White)
                 }
             }
         )
+
+        // === 新增：熱銷排行彈跳視窗 ===
+        if (showRanking) {
+            HotSalesDialog(
+                products = products,
+                soldMap = soldMap,
+                onDismiss = { showRanking = false }
+            )
+        }
 
         // 訂單查詢彈跳視窗
         if (showOrderHistory) {
@@ -166,7 +182,7 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
                 }
             }
         } else {
-            // === 步驟二：訂單確認與結帳 ===
+            // === 步驟二：訂單確認與結帳 (保持不變) ===
             Column(modifier = Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
                 Text("1. 您的訂單", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 Text("預約日期: $selectedDate", color = Color(0xFF1976D2), fontWeight = FontWeight.Bold)
@@ -266,14 +282,102 @@ fun CustomerScreen(viewModel: BakeryViewModel) {
     }
 }
 
-// === 修改後的：訂單查詢視窗元件 ===
+// === 新增功能：熱銷排行視窗元件 ===
+@Composable
+fun HotSalesDialog(
+    products: List<Product>,
+    soldMap: Map<String, Int>,
+    onDismiss: () -> Unit
+) {
+    // 計算並排序：將商品與其銷售量結合，然後排序取前 5 名
+    val topProducts = products.map { product ->
+        // 建立一個 Pair: (Product, 銷售量)
+        product to (soldMap[product.name] ?: 0)
+    }.sortedByDescending { it.second } // 依照銷售量 (it.second) 由大到小排序
+        .take(5) // 只取前 5 名
+
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(8.dp),
+            shape = RoundedCornerShape(16.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 標題
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.EmojiEvents, contentDescription = null, tint = Color(0xFFFFD700), modifier = Modifier.size(28.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "本月熱銷 TOP 5",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFD32F2F)
+                    )
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 顯示列表
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.heightIn(max = 350.dp)
+                ) {
+                    items(topProducts) { (product, count) ->
+                        val rank = topProducts.indexOfFirst { it.first == product } + 1
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                // 顯示名次徽章
+                                Surface(
+                                    color = if (rank <= 3) Color(0xFFFFD700) else Color.LightGray,
+                                    shape = RoundedCornerShape(8.dp),
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Text(text = "$rank", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(text = product.name, fontSize = 16.sp, fontWeight = FontWeight.Medium)
+                            }
+                            Text(
+                                text = "已售出 $count",
+                                fontSize = 14.sp,
+                                color = Color.Gray
+                            )
+                        }
+                        Divider(color = Color.LightGray.copy(alpha = 0.3f), modifier = Modifier.padding(top = 8.dp))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = onDismiss,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFF9800)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("關閉")
+                }
+            }
+        }
+    }
+}
+
+// 訂單查詢視窗元件 (保持原樣)
 @Composable
 fun OrderQueryDialog(
     allOrders: List<BakeryOrder>,
     currentEmail: String,
     onDismiss: () -> Unit
 ) {
-    // 根據目前輸入的 Email 篩選訂單
     val myOrders = allOrders.filter { it.email == currentEmail }
 
     Dialog(onDismissRequest = onDismiss) {
@@ -285,7 +389,6 @@ fun OrderQueryDialog(
             colors = CardDefaults.cardColors(containerColor = Color.White)
         ) {
             Column(modifier = Modifier.padding(16.dp)) {
-                // 標題列
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -321,7 +424,6 @@ fun OrderQueryDialog(
                                     ) {
                                         Text("${order.pickupDate} ${order.pickupTime}", fontWeight = FontWeight.Bold, color = Color(0xFFE65100))
 
-                                        // ✅ 修改重點：只要狀態不是 "pending" (代表後台已處理) 就顯示已完成
                                         val isReady = order.status != "pending"
                                         val statusColor = if (isReady) Color(0xFF4CAF50) else Color(0xFFFF9800)
                                         val statusText = if (isReady) "可取貨 / 已完成" else "準備中"
@@ -335,7 +437,6 @@ fun OrderQueryDialog(
                                     }
                                     Spacer(modifier = Modifier.height(4.dp))
 
-                                    // 顯示商品摘要
                                     order.items.forEach { item ->
                                         Text("• ${item.name} x${item.qty}", fontSize = 14.sp)
                                     }
